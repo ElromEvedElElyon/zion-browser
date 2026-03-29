@@ -1,0 +1,32 @@
+{
+  "name": "HackenProof NEAR Critical Submission",
+  "description": "Login to HackenProof and navigate to NEAR submission page",
+  "steps": [
+    {
+      "action": "get",
+      "url": "https://hackenproof.com/signin",
+      "description": "Load login page"
+    },
+    {
+      "action": "login",
+      "url": "https://hackenproof.com/signin",
+      "data": {
+        "username": "inteligenciaartificial.now@gmail.com",
+        "password": "HackenElrom2026!Sec#99",
+        "user_field": "email",
+        "pass_field": "password"
+      },
+      "wait": 2
+    },
+    {
+      "action": "get",
+      "url": "https://hackenproof.com/programs",
+      "description": "Browse available programs"
+    },
+    {
+      "action": "get",
+      "url": "https://hackenproof.com/near-protocol",
+      "description": "Navigate to NEAR program"
+    }
+  ]
+}

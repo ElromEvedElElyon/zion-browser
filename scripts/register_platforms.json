@@ -1,0 +1,66 @@
+{
+  "name": "Register on All Bounty Platforms",
+  "description": "Navigate to registration pages for all unregistered platforms",
+  "steps": [
+    {
+      "action": "get",
+      "url": "https://bugcrowd.com/user/sign_up",
+      "description": "Bugcrowd registration (OpenAI Safety $100K)"
+    },
+    {
+      "action": "get",
+      "url": "https://bugcrowd.com/openai",
+      "description": "OpenAI program page"
+    },
+    {
+      "action": "get",
+      "url": "https://algora.io",
+      "description": "Algora bounties (GitHub OAuth, instant pay)"
+    },
+    {
+      "action": "get",
+      "url": "https://app.grayswan.ai/arena/challenge/safeguards/rules",
+      "description": "Gray Swan Arena ($140K pool)"
+    },
+    {
+      "action": "get",
+      "url": "https://audits.sherlock.xyz/contests",
+      "description": "Sherlock audit contests ($47K-$200K)"
+    },
+    {
+      "action": "get",
+      "url": "https://app.hats.finance/",
+      "description": "Hats Finance (NO KYC, on-chain pay)"
+    },
+    {
+      "action": "get",
+      "url": "https://cantina.xyz/competitions",
+      "description": "Cantina competitions ($50K+ pools)"
+    },
+    {
+      "action": "get",
+      "url": "https://agentbounty.org/",
+      "description": "AgentBounty (319 AI bounties)"
+    },
+    {
+      "action": "get",
+      "url": "https://mindrift.ai/",
+      "description": "Mindrift ($15-$100/hr AI training)"
+    },
+    {
+      "action": "get",
+      "url": "https://codehawks.cyfrin.io/",
+      "description": "CodeHawks audit competitions"
+    },
+    {
+      "action": "get",
+      "url": "https://huntr.com",
+      "description": "huntr.com AI/ML vulnerabilities"
+    },
+    {
+      "action": "get",
+      "url": "https://superteam.fun/earn/listing/tokenton26-ai-track-dollar8500-prize-pool/",
+      "description": "TokenTon26 AI Track ($8,500, deadline Apr 2!)"
+    }
+  ]
+}

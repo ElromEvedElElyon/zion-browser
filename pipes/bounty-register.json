@@ -1,0 +1,51 @@
+{
+  "name": "Bounty Platform Registration Pipeline",
+  "description": "Register on multiple bug bounty platforms in sequence",
+  "steps": [
+    {
+      "action": "cookies_import",
+      "desc": "Import Firefox cookies for existing sessions",
+      "data": {}
+    },
+    {
+      "action": "get",
+      "url": "https://hackenproof.com",
+      "desc": "Check HackenProof access",
+      "save_as": "hp_title"
+    },
+    {
+      "action": "get",
+      "url": "https://hackenproof.com/programs",
+      "desc": "Browse HackenProof programs"
+    },
+    {
+      "action": "extract_links",
+      "desc": "Find NEAR Protocol program",
+      "data": {"pattern": "near|NEAR"}
+    },
+    {
+      "action": "get",
+      "url": "https://bugcrowd.com/openai",
+      "desc": "Check Bugcrowd OpenAI program"
+    },
+    {
+      "action": "get",
+      "url": "https://audits.sherlock.xyz",
+      "desc": "Check Sherlock contests"
+    },
+    {
+      "action": "get",
+      "url": "https://cantina.xyz",
+      "desc": "Check Cantina contests"
+    },
+    {
+      "action": "get",
+      "url": "https://app.grayswan.ai",
+      "desc": "Check Gray Swan Arena"
+    },
+    {
+      "action": "print",
+      "data": {"message": "Pipeline complete — check results above for accessible platforms"}
+    }
+  ]
+}

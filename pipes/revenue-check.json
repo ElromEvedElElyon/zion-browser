@@ -1,0 +1,45 @@
+{
+  "name": "Revenue Pipeline Status Check",
+  "description": "Check status of all revenue channels",
+  "steps": [
+    {
+      "action": "get",
+      "url": "https://immunefi.com/bug-bounties/",
+      "desc": "Check Immunefi active bounties"
+    },
+    {
+      "action": "get",
+      "url": "https://code4rena.com/contests",
+      "desc": "Check Code4rena contests"
+    },
+    {
+      "action": "get",
+      "url": "https://hackenproof.com/programs",
+      "desc": "Check HackenProof programs"
+    },
+    {
+      "action": "api",
+      "url": "https://api.github.com/repos/projectdiscovery/nuclei-templates/pulls?state=open&per_page=20",
+      "desc": "Check nuclei-templates open PRs"
+    },
+    {
+      "action": "get",
+      "url": "https://elromevedelelyon.github.io/taptoons/",
+      "desc": "Verify TapToons v2 is LIVE"
+    },
+    {
+      "action": "get",
+      "url": "https://elromevedelelyon.github.io/taptoons-v1/",
+      "desc": "Verify TapToons v1 is LIVE"
+    },
+    {
+      "action": "search",
+      "data": {"query": "Sherlock audit contest active 2026"},
+      "desc": "Search for active Sherlock contests"
+    },
+    {
+      "action": "print",
+      "data": {"message": "Revenue check complete. Review results above."}
+    }
+  ]
+}
