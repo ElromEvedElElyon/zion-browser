@@ -1,3 +1,14 @@
 __pycache__/
 *.pyc
+*.pyo
 .zion/
+.env
+.env.*
+*.secret
+*.credentials
+*.key
+.claude/
+*.log
+*.bak
+node_modules/
+.DS_Store
