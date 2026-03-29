@@ -404,17 +404,27 @@ class LionAgent:
         return learned
 
     def recall(self, domain):
-        """What do we know about a domain?"""
+        """What do we know about a domain? Supports partial matching."""
         site = self.kb.get_site(domain)
         auth = self.kb.get_auth(domain)
-        patterns = self.kb.get_patterns(domain)
-        cookies = self.kb.get_required_cookies(domain)
+        # Partial match: if no exact match, search all known sites
+        matched_domain = domain
+        if not site:
+            for d in self.kb.sites:
+                if domain.lower() in d.lower():
+                    site = self.kb.get_site(d)
+                    auth = self.kb.get_auth(d)
+                    matched_domain = d
+                    break
+        patterns = self.kb.get_patterns(matched_domain)
+        cookies = self.kb.get_required_cookies(matched_domain)
 
-        # Get errors for this domain
-        errors = [e for e in self.kb.errors["errors"] if e.get("domain") == domain][-5:]
+        # Get errors for this domain (partial match too)
+        errors = [e for e in self.kb.errors["errors"]
+                  if domain.lower() in e.get("domain", "").lower()][-5:]
 
         return {
-            "domain": domain,
+            "domain": matched_domain,
             "known": bool(site),
             "site": site,
             "auth_strategy": auth,

@@ -84,7 +84,7 @@ CONFIG_FILE = ZION_DIR / "config.json"
 PIPES_DIR = ZION_DIR / "pipes"
 
 MAX_REDIRECTS = 10
-TIMEOUT = 30
+TIMEOUT = 15
 MAX_RESPONSE = 2 * 1024 * 1024  # 2MB max per response (RAM budget)
 MAX_CACHE_SIZE = 10 * 1024 * 1024  # 10MB total cache
 CACHE_TTL = 300  # 5 min cache
@@ -706,7 +706,13 @@ class ZionPage:
     @property
     def text(self):
         self._ensure_parsed()
-        return self._parser.get_text()
+        t = self._parser.get_text()
+        # Fallback: for JSON/plain text responses, return body directly
+        if not t.strip() and self.body:
+            ct = self.headers.get("Content-Type", "")
+            if "json" in ct or "text/plain" in ct or "html" not in ct:
+                return self.body.strip()
+        return t
 
     @property
     def links(self):
@@ -744,6 +750,9 @@ class ZionPage:
         """Detect pages that require JavaScript to render content."""
         if not self.body:
             return False
+        # Pages with many links or working forms are server-rendered
+        if len(self.links) > 10 or len(self.forms) > 2:
+            return False
         text = self.text.strip()
         text_lines = [l.strip() for l in text.split("\n") if l.strip()]
         # Page has HTML but very little visible text = JS-rendered
@@ -753,7 +762,7 @@ class ZionPage:
         has_noscript = "<noscript" in self.body.lower()
         has_react_root = ('id="root"' in self.body or 'id="app"' in self.body or
                           'id="__next"' in self.body or 'ng-app' in self.body)
-        # Score-based detection
+        # Score-based detection — threshold 4 to reduce false positives
         score = 0
         if has_html and few_text:
             score += 2
@@ -765,7 +774,7 @@ class ZionPage:
             score += 2
         if len(self.forms) == 0 and "form" in self.body.lower():
             score += 1
-        return score >= 3
+        return score >= 4
 
     @property
     def is_json(self):
@@ -906,6 +915,15 @@ class ZionBrowser:
         elif note == "js_only":
             return "JS-ONLY: Use 'zion-cdp chrome' for full page rendering"
         return None
+
+    def request(self, url, method="GET", data=None, headers=None, json_data=None):
+        """Direct HTTP request — returns ZionPage."""
+        status, h, body, final = self.http.request(url, method=method, data=data,
+                                                    headers=headers, json_data=json_data,
+                                                    use_cache=False)
+        self.page = ZionPage(status, h, body, final)
+        self._record_navigation(url, self.page)
+        return self.page
 
     def post(self, url, data, headers=None):
         """POST form data."""
