@@ -480,7 +480,7 @@ class ZionHTTP:
             "User-Agent": USER_AGENT,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
+            "Accept-Encoding": "identity",
             "Connection": "keep-alive",
             "DNT": "1",
             "Upgrade-Insecure-Requests": "1",
@@ -521,10 +521,27 @@ class ZionHTTP:
                     return zlib.decompress(data)
                 except Exception:
                     pass
+        elif encoding == "br":
+            # Brotli: try Python brotli module, fallback to identity re-request
+            try:
+                import brotli
+                return brotli.decompress(data)
+            except ImportError:
+                pass  # brotli not installed, data returned as-is
+            except Exception:
+                pass
+        # For any unknown encoding, check if data looks like compressed binary
+        if encoding and encoding not in ("gzip", "deflate", "br", "identity"):
+            pass  # Unknown encoding, return raw
         return data
 
+    # Retry config: status codes that should trigger retry with backoff
+    RETRY_CODES = {429, 500, 502, 503, 504}
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = [1, 2, 4]  # seconds
+
     def request(self, url, method="GET", data=None, headers=None, json_data=None, use_cache=True):
-        """Make HTTP request. Returns (status, headers, body, final_url)."""
+        """Make HTTP request with retry + backoff. Returns (status, headers, body, final_url)."""
         # Check cache for GET requests
         if method == "GET" and use_cache:
             cached = self.cache.get(url)
@@ -545,6 +562,30 @@ class ZionHTTP:
             if method == "POST":
                 h["Content-Type"] = "application/x-www-form-urlencoded"
 
+        last_result = None
+        for attempt in range(self.MAX_RETRIES):
+            result = self._do_request(url, method, data, h)
+            status = result[0]
+
+            # Success or non-retryable error
+            if status not in self.RETRY_CODES:
+                return result
+
+            last_result = result
+            # Retry with backoff
+            if attempt < self.MAX_RETRIES - 1:
+                delay = self.RETRY_BACKOFF[min(attempt, len(self.RETRY_BACKOFF) - 1)]
+                # Respect Retry-After header for 429
+                if status == 429:
+                    retry_after = result[1].get("Retry-After", "")
+                    if retry_after.isdigit():
+                        delay = min(int(retry_after), 10)
+                time.sleep(delay)
+
+        return last_result  # Return last attempt result
+
+    def _do_request(self, url, method, data, h):
+        """Single HTTP request attempt. Returns (status, headers, body, final_url)."""
         req = urllib.request.Request(url, data=data, headers=h, method=method)
 
         try:
@@ -699,6 +740,34 @@ class ZionPage:
                  "cf-ray" in str(self.headers).lower()))
 
     @property
+    def is_js_only(self):
+        """Detect pages that require JavaScript to render content."""
+        if not self.body:
+            return False
+        text = self.text.strip()
+        text_lines = [l.strip() for l in text.split("\n") if l.strip()]
+        # Page has HTML but very little visible text = JS-rendered
+        has_html = "<html" in self.body[:500].lower()
+        has_scripts = self.body.lower().count("<script") > 2
+        few_text = len(text_lines) < 5
+        has_noscript = "<noscript" in self.body.lower()
+        has_react_root = ('id="root"' in self.body or 'id="app"' in self.body or
+                          'id="__next"' in self.body or 'ng-app' in self.body)
+        # Score-based detection
+        score = 0
+        if has_html and few_text:
+            score += 2
+        if has_scripts:
+            score += 1
+        if has_noscript:
+            score += 1
+        if has_react_root:
+            score += 2
+        if len(self.forms) == 0 and "form" in self.body.lower():
+            score += 1
+        return score >= 3
+
+    @property
     def is_json(self):
         ct = self.headers.get("Content-Type", "")
         return "json" in ct
@@ -752,6 +821,9 @@ class ZionPage:
         if self.is_cloudflare:
             lines.append("  [!] CLOUDFLARE PROTECTED — JS challenge required")
 
+        if self.is_js_only:
+            lines.append("  [!] JS-ONLY PAGE — Use 'zion-cdp chrome <url>' for full rendering")
+
         if self.js_redirects:
             lines.append(f"  [>] JS Redirect: {self.js_redirects[0]}")
 
@@ -786,7 +858,7 @@ class ZionBrowser:
         self.session_name = session_name
 
     def go(self, url):
-        """Navigate to URL."""
+        """Navigate to URL with smart error recovery."""
         if not url.startswith("http"):
             url = "https://" + url
         status, headers, body, final_url = self.http.get(url, use_cache=False)
@@ -800,7 +872,40 @@ class ZionBrowser:
             status, headers, body, final_url = self.http.get(redir, use_cache=False)
             self.page = ZionPage(status, headers, body, final_url)
 
+        # Record navigation intelligence
+        self._record_navigation(url, self.page)
+
         return self.page
+
+    def _record_navigation(self, url, page):
+        """Record navigation results for learning — errors, patterns, solutions."""
+        domain = urllib.parse.urlparse(url).netloc
+        # Track error patterns
+        if not hasattr(self, '_error_counts'):
+            self._error_counts = {}
+        if not hasattr(self, '_domain_notes'):
+            self._domain_notes = {}
+
+        if page.status == 403 and page.is_cloudflare:
+            count = self._error_counts.get(domain, 0) + 1
+            self._error_counts[domain] = count
+            self._domain_notes[domain] = "cloudflare_protected"
+        elif page.status >= 400:
+            self._error_counts[domain] = self._error_counts.get(domain, 0) + 1
+        elif page.is_js_only:
+            self._domain_notes[domain] = "js_only"
+
+    def get_navigation_hint(self, url):
+        """Get hint for how to navigate a URL based on learned patterns."""
+        domain = urllib.parse.urlparse(url).netloc
+        if not hasattr(self, '_domain_notes'):
+            return None
+        note = self._domain_notes.get(domain)
+        if note == "cloudflare_protected":
+            return "CLOUDFLARE: Use 'zion-cdp chrome' or import Firefox cookies"
+        elif note == "js_only":
+            return "JS-ONLY: Use 'zion-cdp chrome' for full page rendering"
+        return None
 
     def post(self, url, data, headers=None):
         """POST form data."""

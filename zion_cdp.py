@@ -72,6 +72,15 @@ LOW_MEM_FLAGS = [
     "--disable-images",
     "--blink-settings=imagesEnabled=false",
     "--disable-remote-fonts",
+    "--disable-logging",
+    "--disable-permissions-api",
+    "--disable-notifications",
+    "--disable-speech-api",
+    "--disable-file-system",
+    "--disable-background-timer-throttling",
+    "--aggressive-cache-discard",
+    "--js-flags=--max-old-space-size=64",  # Stricter V8 limit (was 128)
+    "--renderer-process-limit=1",  # Max 1 renderer process
 ]
 
 
@@ -641,19 +650,28 @@ class ZionHybrid:
         }
 
     def chrome_get(self, url):
-        """Navigate via Chrome CDP."""
-        self._ensure_chrome()
-        self.cdp.navigate(url)
-        time.sleep(2)
+        """Navigate via Chrome CDP with fallback to HTTP on crash."""
+        try:
+            self._ensure_chrome()
+            self.cdp.navigate(url)
+            time.sleep(2)
 
-        return {
-            "mode": "chrome",
-            "title": self.cdp.get_title(),
-            "url": self.cdp.get_url(),
-            "text": self.cdp.get_text()[:3000],
-            "links": self.cdp.get_links()[:50],
-            "forms": self.cdp.get_forms(),
-        }
+            result = {
+                "mode": "chrome",
+                "title": self.cdp.get_title(),
+                "url": self.cdp.get_url(),
+                "text": self.cdp.get_text()[:3000],
+                "links": self.cdp.get_links()[:50],
+                "forms": self.cdp.get_forms(),
+            }
+            return result
+
+        except (TimeoutError, ConnectionError, OSError) as e:
+            # Chrome crashed or failed — fallback to HTTP
+            print(f"  [!] Chrome failed: {e}")
+            print(f"  [>] Falling back to HTTP mode...")
+            self.close_chrome()
+            return self.http_get(url)
 
     def chrome_action(self, action, **kwargs):
         """Execute Chrome action (click, type, screenshot, etc.)."""
@@ -684,8 +702,29 @@ class ZionHybrid:
 
         return None
 
+    def _free_ram_before_chrome(self):
+        """Free RAM before launching Chrome — essential for 3.3GB machines."""
+        try:
+            # Drop filesystem caches (needs root, fails silently if not)
+            subprocess.run(["sync"], timeout=5, capture_output=True)
+            # Clear Python garbage
+            import gc
+            gc.collect()
+            # Check available RAM
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        avail_mb = int(line.split()[1]) // 1024
+                        if avail_mb < 300:
+                            print(f"  [!] LOW RAM: {avail_mb}MB — Chrome may crash")
+                            print("  [!] TIP: Close other apps or use 'zion get' (HTTP mode)")
+                        break
+        except Exception:
+            pass
+
     def _ensure_chrome(self):
         if not self._chrome_active:
+            self._free_ram_before_chrome()
             print("  Launching Chrome (low-mem mode)...")
             self.cdp = CDPClient()
             self.cdp.launch_chrome(low_mem=True)

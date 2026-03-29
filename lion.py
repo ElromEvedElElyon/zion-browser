@@ -248,7 +248,7 @@ class LionAgent:
         return urlparse(url).netloc.replace("www.", "")
 
     def navigate(self, url):
-        """Smart navigation using all accumulated knowledge."""
+        """Smart navigation using all accumulated knowledge + auto-recovery."""
         domain = self._domain(url)
         site = self.kb.get_site(domain)
         browser = self._get_browser()
@@ -261,14 +261,54 @@ class LionAgent:
                 page = browser.go(url)
                 result.update(self._process_page(page, domain, url))
 
-            elif strategy["mode"] == "chrome":
-                # Would launch Chrome CDP here
-                page = browser.go(url)  # Fallback to HTTP
+                # AUTO-RECOVERY: Detect problems and suggest solutions
                 if page.is_cloudflare:
                     result["blocked"] = "cloudflare"
-                    result["suggestion"] = "Use 'zion-cdp get <url>' when RAM available (need ~300MB free)"
+                    result["recovery"] = "cloudflare_detected"
+                    self.kb.learn_error(domain, url, "cloudflare",
+                                       "Blocked by Cloudflare JS challenge",
+                                       "Use Chrome CDP: zion-cdp chrome <url>")
+                    self.kb.learn_site(domain, {"cloudflare": True, "requires_js": True})
+                    self.kb.learn_pattern("cloudflare", domain, {"confirmed": True})
+                    result["suggestion"] = "Use 'zion-cdp chrome <url>' (need ~300MB free RAM)"
+
+                elif page.is_js_only:
+                    result["js_only"] = True
+                    result["recovery"] = "js_only_detected"
+                    self.kb.learn_site(domain, {"requires_js": True})
+                    result["suggestion"] = "Page is JS-rendered. Use 'zion-cdp chrome <url>' for forms"
+
+                elif page.status == 403:
+                    # Check if we have a learned solution
+                    solution = self.kb.get_solution(domain, "403")
+                    if solution:
+                        result["learned_solution"] = solution
+                    else:
+                        self.kb.learn_error(domain, url, "403", "Forbidden",
+                                           "Try importing cookies: zion cookies import <domain>")
+                    result["suggestion"] = "Try: zion cookies import " + domain
+
+                elif page.status == 404:
+                    # Session expired pattern (common with Amazon, KDP)
+                    if "session" in page.text.lower() or "sign in" in page.text.lower():
+                        result["recovery"] = "session_expired"
+                        self.kb.learn_error(domain, url, "session_expired",
+                                           "Session expired, need re-login",
+                                           "Re-import cookies or login again")
+                        result["suggestion"] = "Session expired. Re-login or: zion cookies import " + domain
+
+            elif strategy["mode"] == "chrome":
+                # Try HTTP first (saves RAM), only suggest Chrome if needed
+                page = browser.go(url)
+                if page.is_cloudflare:
+                    result["blocked"] = "cloudflare"
+                    result["suggestion"] = "Use 'zion-cdp chrome <url>' when RAM available (need ~300MB free)"
                     self.kb.learn_error(domain, url, "cloudflare", "Blocked by Cloudflare JS challenge",
                                        "Use Chrome CDP mode with adequate RAM")
+                elif page.is_js_only:
+                    result.update(self._process_page(page, domain, url))
+                    result["js_only"] = True
+                    result["suggestion"] = "Forms/content hidden. Use 'zion-cdp chrome <url>'"
                 else:
                     result.update(self._process_page(page, domain, url))
 
@@ -280,15 +320,22 @@ class LionAgent:
                 self.kb.learn_site(domain, {"api_endpoints": [api_url]})
 
             # Learn from successful navigation
-            if result.get("status") == 200:
+            if result.get("status") == 200 and not result.get("blocked"):
                 self.kb.learn_site(domain, {
                     "success_rate": min(1.0, site.get("success_rate", 0.5) + 0.1),
-                    "requires_js": False,
                 })
+                # Only mark requires_js=False if we got meaningful content
+                if result.get("links_count", 0) > 5 and result.get("forms_count", 0) > 0:
+                    self.kb.learn_site(domain, {"requires_js": False})
 
         except Exception as e:
             result["error"] = str(e)
-            self.kb.learn_error(domain, url, type(e).__name__, str(e))
+            # Check for learned solution
+            error_type = type(e).__name__
+            solution = self.kb.get_solution(domain, error_type)
+            if solution:
+                result["learned_solution"] = solution
+            self.kb.learn_error(domain, url, error_type, str(e))
 
         self.kb.save_all()
         return result
@@ -585,6 +632,53 @@ SEED_KNOWLEDGE = {
         "requires_js": True,
         "notes": ["SPA, needs Chrome"],
     },
+    # LEARNED Session 60 — Amazon issues
+    "developer.amazon.com": {
+        "requires_js": True,
+        "brotli": True,
+        "notes": [
+            "Landing page works with HTTP (Accept-Encoding: identity)",
+            "Registration form is JS-rendered (React) — needs Chrome CDP",
+            "Sign-in page at amazon.com/ap/signin MUST use Accept-Encoding: identity",
+            "Brotli compression even when not requested — FIXED with identity header",
+            "Console/apps pages redirect to registration if not completed",
+            "Cookies from Firefox can be imported for auth",
+        ],
+    },
+    "kdp.amazon.com": {
+        "requires_js": False,
+        "brotli": True,
+        "notes": [
+            "Bookshelf works with HTTP (SSR)",
+            "Account page (account.kdp.amazon.com) is JS-only",
+            "Session expires FAST — re-login frequently needed",
+            "2SV required for royalty payments",
+            "Create title at: /action/dualbookshelf.createnew/create",
+        ],
+    },
+    "www.amazon.com": {
+        "brotli": True,
+        "requires_js": False,
+        "notes": [
+            "CRITICAL: Uses Brotli compression by default even with gzip request",
+            "MUST use Accept-Encoding: identity to get readable content",
+            "Sign-in forms detectable with HTTP (after identity encoding fix)",
+            "CSRF token: appActionToken in hidden fields",
+        ],
+    },
+    "sell.amazon.com": {
+        "brotli": True,
+        "requires_js": True,
+        "notes": ["Seller Central is JS-heavy SPA", "Digital downloads PROHIBITED for 3rd party"],
+    },
+    "account.kdp.amazon.com": {
+        "requires_js": True,
+        "notes": ["Fully JS-rendered account settings", "Needs Chrome CDP"],
+    },
+    "npmjs.com": {
+        "requires_js": True,
+        "notes": ["Login/token generation needs browser", "npm CLI uses tokens from ~/.npmrc"],
+    },
 }
 
 SEED_AUTH = {
@@ -602,6 +696,18 @@ SEED_AUTH = {
         "type": "form",
         "login_url": "https://bugcrowd.com/user/sign_in",
         "fields": {"username": "user[email]", "password": "user[password]"},
+    },
+    # Amazon — learned Session 60
+    "developer.amazon.com": {
+        "type": "cookie_import",
+        "login_url": "https://www.amazon.com/ap/signin?openid.assoc_handle=mas_dev_portal",
+        "notes": "Import cookies from Firefox first: zion cookies import amazon.com",
+        "fields": {"username": "email", "password": "password"},
+    },
+    "kdp.amazon.com": {
+        "type": "cookie_import",
+        "login_url": "https://kdp.amazon.com/en_US/signin",
+        "notes": "Session expires fast. Re-import cookies frequently.",
     },
 }
 
