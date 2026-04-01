@@ -1,0 +1,31 @@
+# ZionBrowser v2.0.1
+
+> Ultra-Lightweight AI Agent Browser Toolkit
+> Free & Open Source — MIT License
+
+ZionBrowser is a CLI browser for AI agents written in pure Python with zero external dependencies. It uses ~5MB RAM compared to Firefox's 500MB+.
+
+## Modules
+1. ZionBrowser Core — CLI browser with streaming, cookies, forms, caching
+2. ZionAgent — Clean Python API for Claude, GPT, and AI agents + MCP server
+3. ZionCDP — Chrome DevTools Protocol for JavaScript-heavy sites
+4. LION — Learning AI that remembers sites, auth flows, error patterns
+5. LION-1 — Auth token hunter + prompt injection shield
+6. PIRATE — 8-layer military security defender (~10MB RAM)
+
+## Quick Start
+```
+git clone https://github.com/ElromEvedElElyon/zion-browser.git
+cd zion-browser && python3 setup.py
+zion get https://example.com
+```
+
+## Requirements
+- Python 3.6+
+- Any OS (Linux, macOS, Windows)
+- No pip packages needed
+
+## Links
+- Source: https://github.com/ElromEvedElElyon/zion-browser
+- Website: https://elromevedelelyon.github.io/buy-zion-browser/
+- License: MIT

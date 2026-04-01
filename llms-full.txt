@@ -1,0 +1,108 @@
+# ZionBrowser v2.0.1 — Complete Reference for LLMs
+
+> Ultra-Lightweight AI Agent Browser Toolkit
+> Free & Open Source — MIT License
+> Pure Python stdlib. ZERO dependencies. ~5MB RAM.
+
+## Overview
+ZionBrowser is designed for AI agents (Claude Code, GPT, etc.) that need to browse the web on low-resource machines. It runs on 3.3GB RAM machines where Firefox would crash.
+
+## 6 Modules
+
+### 1. ZionBrowser Core
+CLI browser with:
+- HTTP client with streaming responses (never loads full page if not needed)
+- Firefox cookie import (transfer sessions without re-login)
+- Smart form detection with CSRF token extraction
+- DuckDuckGo search built-in
+- Response caching + bookmark manager
+- Interactive mode (`zion i`)
+- HTTP API server for AI agents (`zion serve 8080`)
+- Task pipeline engine (JSON-driven multi-step automation)
+
+### 2. ZionAgent — AI Interface
+Python API for LLM integration:
+- `browse(url)` — Returns page text as dict
+- `search(query)` — DuckDuckGo search results
+- `forms(url)` — Detect forms + extract CSRF tokens
+- `submit(url, data)` — POST form data
+- `login(url, user, pass)` — Auth flow with cookie persistence
+- `pipeline(tasks)` — Multi-step automation
+- MCP Server mode for Model Context Protocol
+
+### 3. ZionCDP — Chrome DevTools Protocol
+For JavaScript-heavy sites:
+- WebSocket Chrome DevTools integration
+- Ultra-minimal Chrome flags (128MB V8 heap, single-process)
+- Use HTTP for 90% of tasks, Chrome only for SPAs
+- Cloudflare bypass capability
+
+### 4. LION — Learning AI Brain
+Autonomous learning:
+- Auto-learns site structures and form fields
+- Auth flow memory (remembers logins across sessions)
+- Error memory with auto-solutions
+- Cookie intelligence database
+- Anti-bot detection awareness
+- Navigation strategy suggestions
+
+### 5. LION-1 — The Hunter
+Auth resource collection:
+- Cookie harvesting from Firefox, Chrome, all browsers
+- API key and token discovery across machine
+- OAuth token and session finder
+- Prompt injection shield (protects against LLM attacks)
+- File integrity monitoring (HMAC)
+- Shadow backups of critical files
+
+### 6. PIRATE — Military Defender
+8-layer security running on ~10MB:
+- File monitor + process scanner
+- Network guardian + port sentinel
+- Rootkit detector + malware signatures
+- Auto-quarantine threats
+- System hardening automation
+- Counter-defense measures
+
+## CLI Commands
+```
+zion get <url>                     Fetch & show page text
+zion links <url>                   Extract links
+zion forms <url>                   Show forms
+zion submit <url> key=val&k2=v2    POST form data
+zion login <url> <user> <pass>     Login to site
+zion api <url>                     Fetch JSON API
+zion download <url> <file>         Download file
+zion cookies [import|export|list]  Cookie management
+zion session [list|switch|new]     Session management
+zion pipe <pipeline.json>          Execute task pipeline
+zion search <query>                Quick web search via DuckDuckGo
+zion mem                           Show memory usage
+zion i                             Interactive mode
+zion serve [port]                  HTTP API server for AI agents
+```
+
+## Python API
+```python
+from zion_browser import ZionAgent
+agent = ZionAgent()
+page = agent.browse("https://example.com")
+results = agent.search("AI frameworks 2026")
+agent.login("https://site.com", "user", "pass")
+```
+
+## Technical Specs
+- Language: Python 3.6+
+- Dependencies: 0 (pure stdlib)
+- RAM Usage: ~3-5MB browser, ~10MB with security
+- Lines of Code: 5,982
+- OS: Linux, macOS, Windows
+- License: MIT
+
+## Source Code
+https://github.com/ElromEvedElElyon/zion-browser
+
+## Author
+Padrao Bitcoin Atividades de Internet LTDA
+CNPJ: 51.148.891/0001-69
+Email: standardbitcoin.io@gmail.com

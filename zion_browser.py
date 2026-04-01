@@ -36,8 +36,8 @@ Usage:
     zion i                             Interactive mode
     zion serve [port]                  HTTP API server for AI agents
 
-Product: $29.99 — AI Agent Browser Toolkit
-License: Padrao Bitcoin — standardbitcoin.io@gmail.com
+License: MIT — Free & Open Source
+Contact: standardbitcoin.io@gmail.com
 
 (c) 2026 Padrao Bitcoin Atividades de Internet LTDA
 CNPJ: 51.148.891/0001-69
@@ -70,7 +70,7 @@ from configparser import ConfigParser
 # CONFIG
 # ===================================================
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 PRODUCT_NAME = "ZionBrowser"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
